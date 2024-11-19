@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 0%;
+  --foreground: 0 0% 100%;
+}
+
+body {
+  background-color: #000000;
+  color: rgb(var(--foreground));
+}
+
+[data-radix-popper-content-wrapper] [role="dialog"] button[type="button"] {
+  display: none !important;
+}
+
+/* Remove dialog animation */
+.dialog-overlay[data-state="open"],
+.dialog-content[data-state="open"] {
+  animation: none !important;
+}
+/* These are more specific selectors to ensure the blue X is removed */
+[role="dialog"] [data-radix-collection-item] {
+  display: none !important;
+}
+
+[data-radix-dialog-overlay] {
+  display: none !important;
+}
+
+.dialog-overlay {
+  display: none !important;
+}
+
+[role="dialog"] > button {
+  display: none !important;
+}
+
+/* Target any close button that might be added by Radix */
+[data-dialog-close] {
+  display: none !important;
+}
+
+/* Extra specific selector */
+div[role="dialog"] > button[type="button"]:first-of-type {
+  display: none !important;
+}
+
+/* Force remove any dialog overlays */
+div[data-radix-popper-content-wrapper] > div[role="dialog"] > button {
+  display: none !important;
+}
