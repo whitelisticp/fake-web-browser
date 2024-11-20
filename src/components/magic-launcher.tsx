@@ -1,11 +1,18 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Command, Maximize2, X, ExternalLink, MousePointerClick } from 'lucide-react';
+import { Command, Maximize2, X, ExternalLink, MousePointerClick, Minus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+interface MinimizedTab {
+  id: number;
+  title: string;
+  url: string;
+  iframeRef: React.RefObject<HTMLIFrameElement>;
+}
 
 interface ProjectCardProps {
   title: string;
@@ -14,7 +21,12 @@ interface ProjectCardProps {
   expanded: boolean;
   onExpand: () => void;
   onClose: () => void;
+  onMinimize: (iframeRef: React.RefObject<HTMLIFrameElement>) => void;
   index: number;
+  id: number;
+  minimizedTabs: MinimizedTab[];
+  onTabClick: (tab: MinimizedTab) => void;
+  onTabClose: (id: number) => void;
 }
 
 interface SiteData {
@@ -24,6 +36,77 @@ interface SiteData {
   url: string;
 }
 
+const MinimizedTabs = ({ 
+  tabs, 
+  onRestore 
+}: { 
+  tabs: MinimizedTab[];
+  onRestore: (tab: MinimizedTab) => void;
+}) => (
+  <div className="fixed bottom-14 left-0 right-0 bg-[#030303]/95 backdrop-blur-sm border-t border-purple-900/20 z-40">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="h-10 flex items-center gap-2 overflow-x-auto scrollbar-hide">
+        <div className="flex flex-nowrap gap-2 px-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => onRestore(tab)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#0A0A0A] border border-purple-900/20 
+                       hover:border-purple-500/30 hover:bg-purple-500/10 transition-all duration-300 group
+                       animate-slideUp whitespace-nowrap"
+            >
+              <div className="h-1.5 w-1.5 rounded-full bg-purple-500/70 group-hover:bg-purple-400 transition-colors" />
+              <span className="text-sm text-purple-300/70 group-hover:text-purple-300 transition-colors">
+                {tab.title}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const BrowserTabs = ({ 
+  activeTab, 
+  tabs, 
+  onTabClick, 
+  onTabClose 
+}: { 
+  activeTab: number | null;
+  tabs: MinimizedTab[];
+  onTabClick: (tab: MinimizedTab) => void;
+  onTabClose: (id: number) => void;
+}) => (
+  <div className="flex-1 overflow-x-auto scrollbar-hide">
+    <div className="flex items-center gap-1 min-w-max px-1">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          onClick={() => onTabClick(tab)}
+          className={cn(
+            "flex items-center gap-2 px-2 py-1 min-w-[100px] max-w-[160px] h-7 border-r border-l border-t rounded-t-md border-purple-900/20",
+            "hover:bg-purple-500/5 transition-all duration-300 group relative",
+            activeTab === tab.id ? "bg-[#0A0A0A] border-purple-500/20" : "bg-[#030303]"
+          )}
+        >
+          <div className="h-1.5 w-1.5 rounded-full bg-purple-500/70" />
+          <span className="text-xs text-purple-300/70 truncate flex-1 text-left">
+            {tab.title}
+          </span>
+          <X
+            className="h-3 w-3 text-purple-300/50 hover:text-purple-300 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              onTabClose(tab.id);
+            }}
+          />
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
 const ProjectCard = ({ 
   title, 
   description, 
@@ -31,7 +114,12 @@ const ProjectCard = ({
   expanded, 
   onExpand, 
   onClose, 
-  index 
+  onMinimize,
+  index,
+  id,
+  minimizedTabs,
+  onTabClick,
+  onTabClose
 }: ProjectCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -48,19 +136,15 @@ const ProjectCard = ({
       setIsLoaded(false);
     }
   }, [expanded, isHovered]);
-  
+
   const getExternalUrl = (proxyUrl: string) => {
-    console.log('Input URL:', proxyUrl);
     if (proxyUrl.startsWith('/api/proxy/')) {
       const site = proxyUrl.split('/api/proxy/')[1];
-      console.log('Site extracted:', site);
       const siteUrls: Record<string, string> = {
-        'icpswap': 'https://icpswap.com',
-        'kongswap': 'https://kongswap.io'
+        'icpswap': 'https://app.icpswap.com/swap',
+        'kongswap': 'https://kongswap.io/?viewtab=swap&pool=ICP_ckUSDT'
       };
-      const result = siteUrls[site] || proxyUrl;
-      console.log('Mapped URL:', result);
-      return result;
+      return siteUrls[site] || proxyUrl;
     }
     return proxyUrl;
   };
@@ -68,44 +152,61 @@ const ProjectCard = ({
   return expanded ? (
     <Dialog open={expanded} onOpenChange={onClose}>
       <DialogContent 
-        className="max-w-[100vw] w-[100vw] h-[100vh] p-0 bg-[#030303] border-0 rounded-none"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
-      >
-        <DialogTitle className="sr-only">{title}</DialogTitle>
-        <header className="relative flex justify-between items-center h-8 px-3 border-b border-purple-900/20 bg-[#030303]">
-          <div className="flex items-center gap-3">
-            <div className="h-1.5 w-1.5 rounded-full bg-purple-500 animate-pulse" />
-            <h2 className="text-sm font-medium text-purple-50/90">{title}</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => window.open(getExternalUrl(url), '_blank')}
-              className="text-purple-50/70 hover:text-purple-400 hover:bg-purple-500/10 h-6 w-6"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="text-purple-50/70 hover:text-purple-400 hover:bg-purple-500/10 h-6 w-6"
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </header>
-        <main className="w-full h-[calc(100vh-2rem)] bg-[#030303]">
-          <iframe 
-            ref={iframeRef}
-            src={url} 
-            className="w-full h-full border-0" 
-            allow="fullscreen"
-          />
-        </main>
-      </DialogContent>
+  className="max-w-[100vw] w-[100vw] h-[100vh] p-0 bg-[#030303] border-0 rounded-none animate-dialogSlideIn"
+  onPointerDownOutside={(e) => e.preventDefault()}
+  onInteractOutside={(e) => e.preventDefault()}
+>
+  <DialogTitle className="sr-only">{title}</DialogTitle>
+  <div className="flex flex-col h-full">
+    <div className="flex items-center justify-between h-8 bg-[#030303] border-b border-purple-900/20">
+      <BrowserTabs
+        activeTab={id}
+        tabs={[...minimizedTabs, { id, title, url, iframeRef }]}
+        onTabClick={(tab) => {
+          onTabClick(tab);
+          if (tab.id !== id) {
+            onMinimize(iframeRef);
+          }
+        }}
+        onTabClose={onTabClose}
+      />
+      <div className="flex items-center gap-1 px-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => window.open(getExternalUrl(url), '_blank')}
+          className="text-purple-50/70 hover:text-purple-400 hover:bg-purple-500/10 h-6 w-6"
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onMinimize(iframeRef)}
+          className="text-purple-50/70 hover:text-purple-400 hover:bg-purple-500/10 h-6 w-6"
+        >
+          <Minus className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          className="text-purple-50/70 hover:text-purple-400 hover:bg-purple-500/10 h-6 w-6"
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </div>
+    <main className="flex-1 bg-[#030303]">
+      <iframe 
+        ref={iframeRef}
+        src={url} 
+        className="w-full h-full border-0" 
+        allow="fullscreen"
+      />
+    </main>
+  </div>
+</DialogContent>
     </Dialog>
   ) : (
     <div
@@ -166,14 +267,14 @@ const ProjectCard = ({
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-purple-900/20 to-[#030303]">
                   <MousePointerClick className="h-8 w-8 text-purple-400/80 mb-3 animate-pulse" />
-                  <span className="text-sm text-purple-400/80 font-medium">Hover to load preview</span>
+                  <span className="text-sm text-purple-400/80 font-medium">Hover to preview</span>
                 </div>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-[#030303]/80 to-transparent z-10" />
             </div>
             <div className="absolute bottom-3 left-3 z-20">
               <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-[#030303] border border-purple-500/20 text-purple-300">
-                {isLoaded ? 'Click to expand' : 'Live Preview'}
+                {isLoaded ? 'Click to expand' : 'Live'}
               </span>
             </div>
           </div>
@@ -182,7 +283,6 @@ const ProjectCard = ({
     </div>
   );
 };
-
 const Footer = () => (
   <div className="fixed bottom-0 left-0 right-0 bg-[#030303]/95 backdrop-blur-sm border-t border-purple-900/20 z-50">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -201,75 +301,102 @@ const Footer = () => (
   </div>
 );
 
-
-
 const Dashboard = () => {
-  const [expandedSite, setExpandedSite] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-
+  const [minimizedTabs, setMinimizedTabs] = useState<MinimizedTab[]>([]);
+  const [expandedSite, setExpandedSite] = useState<number | null>(null);
 
   useEffect(() => {
-    document.title = "Kelp Router";
+    document.title = "ShellOS";
   }, []);
+
+  const handleMinimize = (site: SiteData, iframeRef: React.RefObject<HTMLIFrameElement>) => {
+    setMinimizedTabs(prev => {
+      if (prev.some(tab => tab.id === site.id)) {
+        return prev;
+      }
+      return [...prev, {
+        id: site.id,
+        title: site.title,
+        url: site.url,
+        iframeRef
+      }];
+    });
+    setExpandedSite(null);
+  };
+
+  const handleRestore = (tab: MinimizedTab) => {
+    setMinimizedTabs(prev => prev.filter(t => t.id !== tab.id));
+    setExpandedSite(tab.id);
+  };
+
+  const handleExpand = (siteId: number) => {
+    const existingTab = minimizedTabs.find(tab => tab.id === siteId);
+    if (existingTab) {
+      handleRestore(existingTab);
+    } else {
+      setExpandedSite(siteId);
+    }
+  };
+
+  const handleTabClose = (id: number) => {
+    setMinimizedTabs(prev => prev.filter(t => t.id !== id));
+    if (id === expandedSite) {
+      setExpandedSite(null);
+    }
+  };
 
   const sites: SiteData[] = [
     {
       id: 1,
-      title: "MCSM",
-      description: "Mint immutable MCSC-1 tokens.",
-      url: "https://lutxv-aqaaa-aaaap-ab2xa-cai.icp0.io/"
+      title: "MagicSwap",
+      description: "Coming Soon. Trade with the biggest advantage on ICP.",
+      url: "https://v2sro-viaaa-aaaap-ahftq-cai.icp0.io/"
     },
     {
       id: 2,
-      title: "Launch.Bob.Fun",
-      description: "A token launchpad part of the bob.fun ecosystem.",
-      url: "https://launch.bob.fun"
-    },
-    {
-      id: 3,
-      title: "KongSwap (Coming Soon)",
-      description: "The fastest dex on the Internet Computer.",
-      url: "/api/proxy/kongswap"
-    },
-    {
-      id: 4,
-      title: "ICPSwap (Coming Soon)",
-      description: "The biggest dex on the Internet Computer.",
-      url: "/api/proxy/icpswap"
-    },
-    {
-      id: 5,
-      title: "ICPEx",
-      description: "A memecoin dex on the Internet Computer.",
-      url: "https://icpex.org/exchange"
-    },
-    {
-      id: 6,
-      title: "ICLight.io",
-      description: "An orderbook dex on the Internet Computer.",
-      url: "https://iclight.io/ICDex/ckBTC/ICP"
-    },
-    {
-      id: 7,
       title: "Uniswap",
       description: "The biggest dex on ETH, now on the Internet Computer.",
       url: "https://app.uniswap.org"
     },
     {
-      id: 8,
+      id: 3,
       title: "Jupiter",
       description: "The biggest dex on SOL, now on the Internet Computer.",
       url: "https://jup.ag"
     },
     {
-      id: 9,
+      id: 4,
       title: "PancakeSwap",
       description: "The biggest dex on BNB, now on the Internet Computer.",
       url: "https://pancakeswap.finance"
     },
+    {
+      id: 5,
+      title: "launch.bob.fun",
+      description: "A token launchpad part of the bob.fun ecosystem.",
+      url: "https://launch.bob.fun"
+    },
+    {
+      id: 6,
+      title: "ICPEx",
+      description: "A memecoin dex on the Internet Computer.",
+      url: "https://icpex.org/exchange"
+    },
+    {
+      id: 7,
+      title: "ICLight.io",
+      description: "An orderbook dex on the Internet Computer.",
+      url: "https://iclight.io/ICDex/ckBTC/ICP"
+    },
+    {
+      id: 8,
+      title: "Bitfinity Bridge",
+      description: "Bridge ICP to Bitfinity and trade on multi-chain.",
+      url: "https://bitfinity.omnity.network/icp"
+    },
   ];
 
-  
   const filteredSites = sites.filter(site => 
     site.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     site.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -290,7 +417,7 @@ const Dashboard = () => {
                 <Command className="h-4 w-4 text-purple-400 group-hover:text-purple-300 transition-colors" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-white">KelpOS</h1>
+                <h1 className="text-xl font-semibold text-white">ShellOS</h1>
                 <p className="text-xs text-white/50">by MCS</p>
               </div>
             </div>
@@ -301,14 +428,14 @@ const Dashboard = () => {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search dapps..."
+                  placeholder="Search apps..."
                   className="h-8 w-64 bg-[#0A0A0A] border border-purple-900/20 rounded-lg px-3 text-sm text-white/70 
                            placeholder:text-white/30 focus:outline-none focus:border-purple-500/50 focus:ring-0
                            hover:border-purple-500/30 transition-colors"
                 />
               </div>
               <a
-                href="https://github.com/MattiasICP/Kelp-Router"
+                href="https://github.com/MattiasICP/ShellOS"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="h-8 w-8 flex items-center justify-center border border-purple-900/20 rounded-lg
@@ -331,15 +458,26 @@ const Dashboard = () => {
               <ProjectCard
                 key={site.id}
                 {...site}
+                id={site.id}
                 index={index}
                 expanded={expandedSite === site.id}
-                onExpand={() => setExpandedSite(site.id)}
+                onExpand={() => handleExpand(site.id)}
                 onClose={() => setExpandedSite(null)}
+                onMinimize={(iframeRef) => handleMinimize(site, iframeRef)}
+                minimizedTabs={minimizedTabs}
+                onTabClick={handleRestore}
+                onTabClose={handleTabClose}
               />
             ))}
           </div>
         </div>
 
+        {minimizedTabs.length > 0 && (
+          <MinimizedTabs 
+            tabs={minimizedTabs} 
+            onRestore={handleRestore}
+          />
+        )}
         <Footer />
       </div>
     </div>
