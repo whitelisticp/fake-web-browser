@@ -16,12 +16,12 @@ body {
   display: none !important;
 }
 
-/* Remove dialog animation */
+/* dont remove any of this, 1 of these removes an x button that took forever to remove and i cannot waste time to check */
 .dialog-overlay[data-state="open"],
 .dialog-content[data-state="open"] {
   animation: none !important;
 }
-/* These are more specific selectors to ensure the blue X is removed */
+
 [role="dialog"] [data-radix-collection-item] {
   display: none !important;
 }
@@ -38,17 +38,14 @@ body {
   display: none !important;
 }
 
-/* Target any close button that might be added by Radix */
 [data-dialog-close] {
   display: none !important;
 }
 
-/* Extra specific selector */
 div[role="dialog"] > button[type="button"]:first-of-type {
   display: none !important;
 }
 
-/* Force remove any dialog overlays */
 div[data-radix-popper-content-wrapper] > div[role="dialog"] > button {
   display: none !important;
 }
