@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Command, Maximize2, X, ExternalLink, MousePointerClick, Minus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -12,6 +12,7 @@ interface MinimizedTab {
   title: string;
   url: string;
   iframeRef: React.RefObject<HTMLIFrameElement>;
+  timestamp?: number;
 }
 
 interface ProjectCardProps {
@@ -42,30 +43,37 @@ const MinimizedTabs = ({
 }: { 
   tabs: MinimizedTab[];
   onRestore: (tab: MinimizedTab) => void;
-}) => (
-  <div className="fixed bottom-14 left-0 right-0 bg-[#030303]/95 backdrop-blur-sm border-t border-purple-900/20 z-40">
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="h-10 flex items-center gap-2 overflow-x-auto scrollbar-hide">
-        <div className="flex flex-nowrap gap-2 px-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => onRestore(tab)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#0A0A0A] border border-purple-900/20 
-                       hover:border-purple-500/30 hover:bg-purple-500/10 transition-all duration-300 group
-                       animate-slideUp whitespace-nowrap"
-            >
-              <div className="h-1.5 w-1.5 rounded-full bg-purple-500/70 group-hover:bg-purple-400 transition-colors" />
-              <span className="text-sm text-purple-300/70 group-hover:text-purple-300 transition-colors">
-                {tab.title}
-              </span>
-            </button>
-          ))}
+}) => {
+  const sortedTabs = useMemo(() => 
+    [...tabs].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)),
+    [tabs]
+  );
+
+  return (
+    <div className="fixed bottom-14 left-0 right-0 bg-[#030303]/95 backdrop-blur-sm border-t border-purple-900/20 z-40">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="h-10 flex items-center gap-2 overflow-x-auto scrollbar-hide">
+          <div className="flex flex-nowrap gap-2 px-2">
+            {sortedTabs.map((tab) => (
+              <div
+                key={`minimized-${tab.id}`}
+                onClick={() => onRestore(tab)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#0A0A0A] border border-purple-900/20 
+                         hover:border-purple-500/30 hover:bg-purple-500/10 transition-all duration-300 group
+                         animate-slideUp whitespace-nowrap cursor-pointer"
+              >
+                <div className="h-1.5 w-1.5 rounded-full bg-purple-500/70 group-hover:bg-purple-400 transition-colors" />
+                <span className="text-sm text-purple-300/70 group-hover:text-purple-300 transition-colors">
+                  {tab.title}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const BrowserTabs = ({ 
   activeTab, 
@@ -77,36 +85,58 @@ const BrowserTabs = ({
   tabs: MinimizedTab[];
   onTabClick: (tab: MinimizedTab) => void;
   onTabClose: (id: number) => void;
-}) => (
-  <div className="flex-1 overflow-x-auto scrollbar-hide">
-    <div className="flex items-center gap-1 min-w-max px-1">
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => onTabClick(tab)}
-          className={cn(
-            "flex items-center gap-2 px-2 py-1 min-w-[100px] max-w-[160px] h-7 border-r border-l border-t rounded-t-md border-purple-900/20",
-            "hover:bg-purple-500/5 transition-all duration-300 group relative",
-            activeTab === tab.id ? "bg-[#0A0A0A] border-purple-500/20" : "bg-[#030303]"
-          )}
-        >
-          <div className="h-1.5 w-1.5 rounded-full bg-purple-500/70" />
-          <span className="text-xs text-purple-300/70 truncate flex-1 text-left">
-            {tab.title}
-          </span>
-          <X
-            className="h-3 w-3 text-purple-300/50 hover:text-purple-300 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              onTabClose(tab.id);
-            }}
-          />
-        </button>
-      ))}
+}) => {
+  return (
+    <div className="flex-1 overflow-x-auto scrollbar-hide">
+      <div className="flex items-center gap-1 min-w-max px-1">
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          const uniqueKey = `browser-tab-${tab.id}-${isActive ? 'active' : 'inactive'}`;
+          
+          return (
+            <div
+              key={uniqueKey}
+              className={cn(
+                "flex items-center gap-2 px-2 py-1 min-w-[100px] max-w-[160px] h-7 border-r border-l border-t rounded-t-md border-purple-900/20",
+                "hover:bg-purple-500/5 transition-all duration-300 group relative",
+                isActive ? "bg-[#0A0A0A] border-purple-500/20" : "bg-[#030303]"
+              )}
+            >
+              <div 
+                className="flex-1 flex items-center gap-2 cursor-pointer"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onTabClick(tab);
+                }}
+              >
+                <div className="h-1.5 w-1.5 rounded-full bg-purple-500/70" />
+                <span className="text-xs text-purple-300/70 truncate flex-1 text-left">
+                  {tab.title}
+                </span>
+              </div>
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTabClose(tab.id);
+                }}
+                className="flex-shrink-0 p-0.5 hover:bg-purple-500/10 rounded cursor-pointer"
+              >
+                <X className="h-3 w-3 text-purple-300/50 hover:text-purple-300 transition-colors" />
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
+  );
+};
+
+const LoadingSpinner = () => (
+  <div className="absolute inset-0 flex items-center justify-center bg-[#030303]">
+    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
   </div>
 );
-
 const ProjectCard = ({ 
   title, 
   description, 
@@ -123,19 +153,29 @@ const ProjectCard = ({
 }: ProjectCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     if (isHovered && !isLoaded) {
+      setIsLoading(true);
       setIsLoaded(true);
     }
   }, [isHovered, isLoaded]);
 
   useEffect(() => {
     if (!expanded && !isHovered && isLoaded) {
-      setIsLoaded(false);
+      const timeout = setTimeout(() => {
+        setIsLoaded(false);
+        setIsLoading(false);
+      }, 300);
+      return () => clearTimeout(timeout);
     }
   }, [expanded, isHovered]);
+
+  const handleIframeLoad = () => {
+    setIsLoading(false);
+  };
 
   const getExternalUrl = (proxyUrl: string) => {
     if (proxyUrl.startsWith('/api/proxy/')) {
@@ -149,64 +189,74 @@ const ProjectCard = ({
     return proxyUrl;
   };
 
+  // Get current tab data
+  const currentTabData = minimizedTabs.find(tab => tab.id === id);
+  const currentTabs = useMemo(() => {
+    if (currentTabData) {
+      return minimizedTabs;
+    }
+    return minimizedTabs.filter(tab => tab.id !== id);
+  }, [minimizedTabs, id, currentTabData]);
+
   return expanded ? (
     <Dialog open={expanded} onOpenChange={onClose}>
       <DialogContent 
-  className="max-w-[100vw] w-[100vw] h-[100vh] p-0 bg-[#030303] border-0 rounded-none animate-dialogSlideIn"
-  onPointerDownOutside={(e) => e.preventDefault()}
-  onInteractOutside={(e) => e.preventDefault()}
->
-  <DialogTitle className="sr-only">{title}</DialogTitle>
-  <div className="flex flex-col h-full">
-    <div className="flex items-center justify-between h-8 bg-[#030303] border-b border-purple-900/20">
-      <BrowserTabs
-        activeTab={id}
-        tabs={[...minimizedTabs, { id, title, url, iframeRef }]}
-        onTabClick={(tab) => {
-          onTabClick(tab);
-          if (tab.id !== id) {
-            onMinimize(iframeRef);
-          }
-        }}
-        onTabClose={onTabClose}
-      />
-      <div className="flex items-center gap-1 px-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => window.open(getExternalUrl(url), '_blank')}
-          className="text-purple-50/70 hover:text-purple-400 hover:bg-purple-500/10 h-6 w-6"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => onMinimize(iframeRef)}
-          className="text-purple-50/70 hover:text-purple-400 hover:bg-purple-500/10 h-6 w-6"
-        >
-          <Minus className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onClose}
-          className="text-purple-50/70 hover:text-purple-400 hover:bg-purple-500/10 h-6 w-6"
-        >
-          <X className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-    </div>
-    <main className="flex-1 bg-[#030303]">
-      <iframe 
-        ref={iframeRef}
-        src={url} 
-        className="w-full h-full border-0" 
-        allow="fullscreen"
-      />
-    </main>
-  </div>
-</DialogContent>
+        className="max-w-[100vw] w-[100vw] h-[100vh] p-0 bg-[#030303] border-0 rounded-none animate-dialogSlideIn"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
+        <DialogTitle className="sr-only">{title}</DialogTitle>
+        <div className="flex flex-col h-full">
+          <div className="flex items-center justify-between h-8 bg-[#030303] border-b border-purple-900/20">
+            <BrowserTabs
+              activeTab={id}
+              tabs={currentTabs}
+              onTabClick={onTabClick}
+              onTabClose={onTabClose}
+            />
+            <div className="flex-shrink-0 flex items-center gap-1 px-2 bg-[#030303]">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => window.open(getExternalUrl(url), '_blank')}
+                className="text-purple-50/70 hover:text-purple-400 hover:bg-purple-500/10 h-6 w-6"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onMinimize(iframeRef)}
+                className="text-purple-50/70 hover:text-purple-400 hover:bg-purple-500/10 h-6 w-6"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="text-purple-50/70 hover:text-purple-400 hover:bg-purple-500/10 h-6 w-6"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+          <main className="flex-1 bg-[#030303] relative">
+            {isLoading && <LoadingSpinner />}
+            <iframe 
+              ref={iframeRef}
+              src={url} 
+              className={cn(
+                "absolute inset-0 w-full h-full border-0",
+                isLoading && "opacity-0"
+              )}
+              allow="fullscreen"
+              onLoad={handleIframeLoad}
+              title={title}
+            />
+          </main>
+        </div>
+      </DialogContent>
     </Dialog>
   ) : (
     <div
@@ -263,6 +313,7 @@ const ProjectCard = ({
                   src={url}
                   className="absolute top-0 left-0 w-full h-full border-0 pointer-events-none scale-100 group-hover:scale-[1.02] transition-transform duration-700"
                   scrolling="no"
+                  onLoad={handleIframeLoad}
                 />
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-purple-900/20 to-[#030303]">
@@ -274,7 +325,7 @@ const ProjectCard = ({
             </div>
             <div className="absolute bottom-3 left-3 z-20">
               <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-[#030303] border border-purple-500/20 text-purple-300">
-                {isLoaded ? 'Click to expand' : 'Live'}
+                {isLoaded ? 'Click to expand' : 'Live Preview'}
               </span>
             </div>
           </div>
@@ -310,43 +361,77 @@ const Dashboard = () => {
     document.title = "ShellOS";
   }, []);
 
-  const handleMinimize = (site: SiteData, iframeRef: React.RefObject<HTMLIFrameElement>) => {
+  // Tab Management Handlers
+  const handleMinimize = useCallback((site: SiteData, iframeRef: React.RefObject<HTMLIFrameElement>) => {
     setMinimizedTabs(prev => {
-      if (prev.some(tab => tab.id === site.id)) {
-        return prev;
+      const existingTabIndex = prev.findIndex(tab => tab.id === site.id);
+      
+      if (existingTabIndex !== -1) {
+        const updatedTabs = [...prev];
+        // Update existing tab without changing the order
+        updatedTabs[existingTabIndex] = {
+          ...updatedTabs[existingTabIndex],
+          iframeRef,
+          timestamp: Date.now()
+        };
+        return updatedTabs;
       }
-      return [...prev, {
-        id: site.id,
-        title: site.title,
-        url: site.url,
-        iframeRef
-      }];
+      
+      // Add new tab
+      return [
+        ...prev,
+        {
+          id: site.id,
+          title: site.title,
+          url: site.url,
+          iframeRef,
+          timestamp: Date.now()
+        }
+      ];
     });
     setExpandedSite(null);
-  };
+  }, []);
 
-  const handleRestore = (tab: MinimizedTab) => {
-    setMinimizedTabs(prev => prev.filter(t => t.id !== tab.id));
+  const handleRestore = useCallback((tab: MinimizedTab) => {
+    // First update timestamp
+    setMinimizedTabs(prev => prev.map(t => 
+      t.id === tab.id ? { ...t, timestamp: Date.now() } : t
+    ));
+    // Then set expanded state
     setExpandedSite(tab.id);
-  };
+  }, []);
 
-  const handleExpand = (siteId: number) => {
+  const handleExpand = useCallback((siteId: number) => {
     const existingTab = minimizedTabs.find(tab => tab.id === siteId);
     if (existingTab) {
       handleRestore(existingTab);
     } else {
       setExpandedSite(siteId);
     }
-  };
+  }, [minimizedTabs, handleRestore]);
 
-  const handleTabClose = (id: number) => {
-    setMinimizedTabs(prev => prev.filter(t => t.id !== id));
-    if (id === expandedSite) {
-      setExpandedSite(null);
-    }
-  };
+  const handleTabClose = useCallback((id: number) => {
+    setMinimizedTabs(prev => {
+      const newTabs = prev.filter(t => t.id !== id);
+      
+      // Handle expanded state
+      if (id === expandedSite) {
+        if (newTabs.length > 0) {
+          // Find most recently used tab
+          const mostRecentTab = newTabs.reduce((prev, current) => 
+            (current.timestamp || 0) > (prev.timestamp || 0) ? current : prev
+          );
+          setExpandedSite(mostRecentTab.id);
+        } else {
+          setExpandedSite(null);
+        }
+      }
+      
+      return newTabs;
+    });
+  }, [expandedSite]);
 
-  const sites: SiteData[] = [
+  const sites = useMemo(() => [
     {
       id: 1,
       title: "MagicSwap",
@@ -394,12 +479,15 @@ const Dashboard = () => {
       title: "Bitfinity Bridge",
       description: "Bridge ICP to Bitfinity and trade on multi-chain.",
       url: "https://bitfinity.omnity.network/icp"
-    },
-  ];
+    }
+  ], []);
 
-  const filteredSites = sites.filter(site => 
-    site.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    site.description.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredSites = useMemo(() => 
+    sites.filter(site => 
+      site.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      site.description.toLowerCase().includes(searchQuery.toLowerCase())
+    ),
+    [sites, searchQuery]
   );
 
   return (
@@ -435,7 +523,7 @@ const Dashboard = () => {
                 />
               </div>
               <a
-                href="https://github.com/MattiasICP/ShellOS"
+                href="https://github.com/MattiasICP/Shell-Router"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="h-8 w-8 flex items-center justify-center border border-purple-900/20 rounded-lg
@@ -454,9 +542,9 @@ const Dashboard = () => {
           </header>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
-            {filteredSites.map((site, index) => (
+            {filteredSites.map((site: SiteData, index: number) => (
               <ProjectCard
-                key={site.id}
+                key={`site-${site.id}`}
                 {...site}
                 id={site.id}
                 index={index}
