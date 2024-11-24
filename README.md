@@ -1,4 +1,7 @@
-## Disclaimer! Use this app at your own risk! This app uses dapps outside of how they were normally designed. There may be unexpected behavior or interactions with apps that are outside of my control. I strongly recommend clicking the external link button to connect to the dapp directly when making large transactions.
+## Disclaimer! Use this app at your own risk! 
+
+# This app uses dapps outside of how they were normally designed. There may be unexpected behavior or interactions with apps that are outside of my control. I strongly recommend clicking the external link button to connect to the dapp directly when making large transactions.
+
 
 # Usage
 This is an experimental web app designed to trade with multiple dexes in one place. Intensive trading often requires multiple windows or monitors to have an effective edge, ShellOS is designed to organize this all in one place in an optimized manner.
