@@ -7,12 +7,21 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+// there are better ways to store this, but i am not going to fix it, nor am i going to elaborate
+interface TabCache {
+  id: number;
+  isLoaded: boolean;
+  lastAccessed: number;
+}
+
 interface MinimizedTab {
   id: number;
   title: string;
+  description: string;
   url: string;
   iframeRef: React.RefObject<HTMLIFrameElement>;
   timestamp?: number;
+  cache?: TabCache;
 }
 
 interface ProjectCardProps {
@@ -23,11 +32,13 @@ interface ProjectCardProps {
   onExpand: () => void;
   onClose: () => void;
   onMinimize: (iframeRef: React.RefObject<HTMLIFrameElement>) => void;
+  onFullClose: () => void;
   index: number;
   id: number;
   minimizedTabs: MinimizedTab[];
   onTabClick: (tab: MinimizedTab) => void;
   onTabClose: (id: number) => void;
+  isActiveTab: boolean;
 }
 
 interface SiteData {
@@ -37,6 +48,14 @@ interface SiteData {
   url: string;
 }
 
+// this sucks
+const LoadingSpinner = () => (
+  <div className="absolute inset-0 flex items-center justify-center bg-[#030303]">
+    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
+  </div>
+);
+
+// minimizes tabs, but does not handle the stuff inside minimized tabs on its own
 const MinimizedTabs = ({ 
   tabs, 
   onRestore 
@@ -75,21 +94,34 @@ const MinimizedTabs = ({
   );
 };
 
+// doesn't handle minimizing, handles the tabs only because this shit was annoying as fuck in one spot
 const BrowserTabs = ({ 
   activeTab, 
   tabs, 
+  currentSite,
   onTabClick, 
   onTabClose 
 }: { 
   activeTab: number | null;
   tabs: MinimizedTab[];
+  currentSite: SiteData | null;
   onTabClick: (tab: MinimizedTab) => void;
   onTabClose: (id: number) => void;
 }) => {
+  const allTabs = useMemo(() => {
+    // Return just tabs if no current site or if site is already in tabs
+    if (!currentSite || tabs.some(tab => tab.id === currentSite.id)) {
+      return tabs;
+    }
+
+    // I removed what I thought was a crucial piece of code here by accident but absolutely nothing happened
+    return tabs;
+  }, [tabs, currentSite]);
+
   return (
     <div className="flex-1 overflow-x-auto scrollbar-hide">
       <div className="flex items-center gap-1 min-w-max px-1">
-        {tabs.map((tab) => {
+        {allTabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const uniqueKey = `browser-tab-${tab.id}-${isActive ? 'active' : 'inactive'}`;
           
@@ -131,12 +163,6 @@ const BrowserTabs = ({
     </div>
   );
 };
-
-const LoadingSpinner = () => (
-  <div className="absolute inset-0 flex items-center justify-center bg-[#030303]">
-    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
-  </div>
-);
 const ProjectCard = ({ 
   title, 
   description, 
@@ -145,37 +171,67 @@ const ProjectCard = ({
   onExpand, 
   onClose, 
   onMinimize,
+  onFullClose,
   index,
   id,
   minimizedTabs,
   onTabClick,
-  onTabClose
+  onTabClose,
+  isActiveTab
 }: ProjectCardProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const cacheRef = useRef<TabCache[]>([]);
 
+  // load management with cache
   useEffect(() => {
-    if (isHovered && !isLoaded) {
-      setIsLoading(true);
-      setIsLoaded(true);
-    }
-  }, [isHovered, isLoaded]);
-
-  useEffect(() => {
-    if (!expanded && !isHovered && isLoaded) {
-      const timeout = setTimeout(() => {
-        setIsLoaded(false);
+    if (expanded || (isHovered && !isLoaded)) {
+      const cachedTab = cacheRef.current.find(t => t.id === id);
+      if (cachedTab) {
+        setIsLoaded(true);
         setIsLoading(false);
-      }, 300);
-      return () => clearTimeout(timeout);
-    }
-  }, [expanded, isHovered]);
+        cachedTab.lastAccessed = Date.now();
+      } else {
+        setIsLoading(true);
+        setIsLoaded(true);
+        cacheRef.current.push({
+          id,
+          isLoaded: true,
+          lastAccessed: Date.now()
+        });
 
-  const handleIframeLoad = () => {
+        // Limit cache size (keep last 5 accessed tabs, i tried 8 and my phone felt like it was going to explode)
+        if (cacheRef.current.length > 5) {
+          cacheRef.current.sort((a, b) => b.lastAccessed - a.lastAccessed);
+          cacheRef.current = cacheRef.current.slice(0, 5);
+        }
+      }
+    }
+  }, [expanded, isHovered, id]);
+
+  // cleanup cache
+  useEffect(() => {
+    const cleanup = () => {
+      const now = Date.now();
+      cacheRef.current = cacheRef.current.filter(
+        tab => now - tab.lastAccessed < 300000 // 5 minutes
+      );
+    };
+
+    const interval = setInterval(cleanup, 60000); // Every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  // load handler (for iframe)
+  const handleIframeLoad = useCallback(() => {
     setIsLoading(false);
-  };
+    const cachedTab = cacheRef.current.find(t => t.id === id);
+    if (cachedTab) {
+      cachedTab.lastAccessed = Date.now();
+    }
+  }, [id]);
 
   const getExternalUrl = (proxyUrl: string) => {
     if (proxyUrl.startsWith('/api/proxy/')) {
@@ -189,17 +245,51 @@ const ProjectCard = ({
     return proxyUrl;
   };
 
-  // Get current tab data
-  const currentTabData = minimizedTabs.find(tab => tab.id === id);
-  const currentTabs = useMemo(() => {
-    if (currentTabData) {
-      return minimizedTabs;
+  // window close handler because this shit refused to work properly for a day
+  const handleWindowClose = useCallback(() => {
+    if (minimizedTabs.length > 0) {
+      const otherTabs = minimizedTabs.filter(tab => tab.id !== id);
+      if (otherTabs.length > 0) {
+        const mostRecentTab = otherTabs.reduce((prev, current) => 
+          (current.timestamp || 0) > (prev.timestamp || 0) ? current : prev
+        );
+        // First switch to the next tab
+        onTabClick(mostRecentTab);
+        // Then close the current tab
+        onTabClose(id);
+      } else {
+        // If this is the last tab, close it and go home
+        onTabClose(id);
+        onFullClose();
+      }
+    } else {
+      // If no tabs at all, just close
+      onClose();
+      onFullClose();
     }
-    return minimizedTabs.filter(tab => tab.id !== id);
-  }, [minimizedTabs, id, currentTabData]);
+  }, [minimizedTabs, id, onTabClick, onTabClose, onClose, onFullClose]);
+
+  // grab current site data with cache info
+  const currentSite = useMemo(() => ({
+    id,
+    title,
+    description,
+    url,
+    cache: cacheRef.current.find(t => t.id === id)
+  }), [id, title, description, url]);
+
+  // guess iframe visibility
+  const isVisible = expanded || (isHovered && isLoaded);
 
   return expanded ? (
-    <Dialog open={expanded} onOpenChange={onClose}>
+    <Dialog 
+      open={expanded} 
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          handleWindowClose();
+        }
+      }}
+    >
       <DialogContent 
         className="max-w-[100vw] w-[100vw] h-[100vh] p-0 bg-[#030303] border-0 rounded-none animate-dialogSlideIn"
         onPointerDownOutside={(e) => e.preventDefault()}
@@ -210,7 +300,8 @@ const ProjectCard = ({
           <div className="flex items-center justify-between h-8 bg-[#030303] border-b border-purple-900/20">
             <BrowserTabs
               activeTab={id}
-              tabs={currentTabs}
+              tabs={minimizedTabs}
+              currentSite={currentSite}
               onTabClick={onTabClick}
               onTabClose={onTabClose}
             />
@@ -234,7 +325,7 @@ const ProjectCard = ({
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={onClose}
+                onClick={handleWindowClose}
                 className="text-purple-50/70 hover:text-purple-400 hover:bg-purple-500/10 h-6 w-6"
               >
                 <X className="h-3.5 w-3.5" />
@@ -248,6 +339,7 @@ const ProjectCard = ({
               src={url} 
               className={cn(
                 "absolute inset-0 w-full h-full border-0",
+                !isVisible && "hidden",
                 isLoading && "opacity-0"
               )}
               allow="fullscreen"
@@ -308,17 +400,28 @@ const ProjectCard = ({
               style={{ paddingBottom: '60%' }}
             >
               {isLoaded ? (
-                <iframe
-                  ref={iframeRef}
-                  src={url}
-                  className="absolute top-0 left-0 w-full h-full border-0 pointer-events-none scale-100 group-hover:scale-[1.02] transition-transform duration-700"
-                  scrolling="no"
-                  onLoad={handleIframeLoad}
-                />
+                <>
+                  {isLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-[#030303] z-10">
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
+                    </div>
+                  )}
+                  <iframe
+                    ref={iframeRef}
+                    src={url}
+                    className={cn(
+                      "absolute top-0 left-0 w-full h-full border-0 pointer-events-none scale-100 group-hover:scale-[1.02] transition-transform duration-700",
+                      !isVisible && "hidden",
+                      isLoading && "opacity-0"
+                    )}
+                    scrolling="no"
+                    onLoad={handleIframeLoad}
+                  />
+                </>
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-purple-900/20 to-[#030303]">
-                  <MousePointerClick className="h-8 w-8 text-purple-400/80 mb-3 animate-pulse" />
-                  <span className="text-sm text-purple-400/80 font-medium">Hover to preview</span>
+                  <MousePointerClick className="h-8 w-8 text-purple-400/100 mb-3 animate-pulse" />
+                  <span className="text-sm text-purple-400/100 font-medium">Hover to preview</span>
                 </div>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-[#030303]/80 to-transparent z-10" />
@@ -356,68 +459,207 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [minimizedTabs, setMinimizedTabs] = useState<MinimizedTab[]>([]);
   const [expandedSite, setExpandedSite] = useState<number | null>(null);
+  const tabCacheRef = useRef<Map<number, TabCache>>(new Map());
 
+  // add more sites here
+  const sites = useMemo(() => [
+    {
+      id: 1,
+      title: "Uniswap",
+      description: "The biggest dex on the Ethereum network.",
+      url: "https://app.uniswap.org"
+    },
+    {
+      id: 2,
+      title: "Jupiter",
+      description: "The biggest aggregator on the Solana network.",
+      url: "https://jup.ag"
+    },
+    {
+      id: 3,
+      title: "PancakeSwap",
+      description: "The biggest dex on the Binance network.",
+      url: "https://pancakeswap.finance"
+    },
+    {
+      id: 4,
+      title: "SushiSwap",
+      description: "A multi-chain aggregator designed for the best rates.",
+      url: "https://www.sushi.com/ethereum/swap"
+    },
+    {
+      id: 5,
+      title: "Aerodrome",
+      description: "The biggest dex on the Base network.",
+      url: "https://aerodrome.finance/"
+    },
+    {
+      id: 6,
+      title: "launch.bob.fun",
+      description: "A pump.fun alternative on the Internet Computer.",
+      url: "https://launch.bob.fun"
+    },
+    {
+      id: 7,
+      title: "ICPEx",
+      description: "A memecoin dex on the Internet Computer.",
+      url: "https://icpex.org/exchange"
+    },
+    {
+      id: 8,
+      title: "ICLight.io",
+      description: "An orderbook dex on the Internet Computer.",
+      url: "https://iclight.io/ICDex/ckBTC/ICP"
+    },
+    {
+      id: 9,
+      title: "Bitfinity Bridge",
+      description: "Bridge ICP to Bitfinity and trade on multi-chain.",
+      url: "https://bitfinity.omnity.network/icp"
+    },
+    {
+      id: 10,
+      title: "Bioniq",
+      description: "The largest NFT marketplace on the Internet Computer.",
+      url: "https://bioniq.io/home/24-hours"
+    },
+  ], []);
+
+  // Tab persistence
   useEffect(() => {
-    document.title = "ShellOS";
+    try {
+      const savedTabs = localStorage.getItem('shellOS-tabs');
+      const savedExpandedSite = localStorage.getItem('shellOS-expandedSite');
+      
+      if (savedTabs) {
+        const parsedTabs = JSON.parse(savedTabs);
+        setMinimizedTabs(parsedTabs.map((tab: any) => ({
+          ...tab,
+          iframeRef: React.createRef(),
+          cache: tabCacheRef.current.get(tab.id)
+        })));
+      }
+      
+      if (savedExpandedSite) {
+        setExpandedSite(Number(savedExpandedSite));
+      }
+    } catch (error) {
+      console.error('Error restoring tabs:', error);
+    }
   }, []);
 
-  // Tab Management Handlers
+  // Save state
+  useEffect(() => {
+    try {
+      const tabsToSave = minimizedTabs.map(({ id, title, url, description, timestamp }) => 
+        ({ id, title, url, description, timestamp })
+      );
+      localStorage.setItem('shellOS-tabs', JSON.stringify(tabsToSave));
+      
+      if (expandedSite) {
+        localStorage.setItem('shellOS-expandedSite', expandedSite.toString());
+      } else {
+        localStorage.removeItem('shellOS-expandedSite');
+      }
+    } catch (error) {
+      console.error('Error saving tabs:', error);
+    }
+  }, [minimizedTabs, expandedSite]);
+
   const handleMinimize = useCallback((site: SiteData, iframeRef: React.RefObject<HTMLIFrameElement>) => {
     setMinimizedTabs(prev => {
       const existingTabIndex = prev.findIndex(tab => tab.id === site.id);
+      const timestamp = Date.now();
       
       if (existingTabIndex !== -1) {
         const updatedTabs = [...prev];
-        // Update existing tab without changing the order
         updatedTabs[existingTabIndex] = {
           ...updatedTabs[existingTabIndex],
           iframeRef,
-          timestamp: Date.now()
+          timestamp,
+          cache: {
+            id: site.id,
+            isLoaded: true,
+            lastAccessed: timestamp
+          }
         };
         return updatedTabs;
       }
       
-      // Add new tab
-      return [
-        ...prev,
-        {
+      const newTab: MinimizedTab = {
+        id: site.id,
+        title: site.title,
+        url: site.url,
+        description: site.description,
+        iframeRef,
+        timestamp,
+        cache: {
           id: site.id,
-          title: site.title,
-          url: site.url,
-          iframeRef,
-          timestamp: Date.now()
+          isLoaded: true,
+          lastAccessed: timestamp
         }
-      ];
+      };
+      
+      return [...prev, newTab];
     });
     setExpandedSite(null);
   }, []);
 
   const handleRestore = useCallback((tab: MinimizedTab) => {
-    // First update timestamp
-    setMinimizedTabs(prev => prev.map(t => 
-      t.id === tab.id ? { ...t, timestamp: Date.now() } : t
-    ));
-    // Then set expanded state
-    setExpandedSite(tab.id);
-  }, []);
+    const timestamp = Date.now();
+  setMinimizedTabs(prev => prev.map(t => 
+    t.id === tab.id 
+      ? { 
+          ...t, 
+          timestamp,
+          cache: {
+            id: t.id,  // this took a straight hour to fix btw
+            isLoaded: true,
+            lastAccessed: timestamp
+          }
+        } 
+      : t
+  ));
+  setExpandedSite(tab.id);
+}, []);
 
-  const handleExpand = useCallback((siteId: number) => {
-    const existingTab = minimizedTabs.find(tab => tab.id === siteId);
-    if (existingTab) {
-      handleRestore(existingTab);
-    } else {
-      setExpandedSite(siteId);
-    }
-  }, [minimizedTabs, handleRestore]);
+const handleExpand = useCallback((siteId: number) => {
+  const existingTab = minimizedTabs.find(tab => tab.id === siteId);
+  const targetSite = sites.find(site => site.id === siteId);
+
+  if (existingTab) {
+    handleRestore(existingTab);
+  } else if (targetSite) {
+    // initialize the tab first, then expand it
+    const newTab: MinimizedTab = {
+      id: targetSite.id,
+      title: targetSite.title,
+      url: targetSite.url,
+      description: targetSite.description,
+      iframeRef: { current: null },
+      timestamp: Date.now(),
+      cache: {
+        id: targetSite.id,
+        isLoaded: true,
+        lastAccessed: Date.now()
+      }
+    };
+    
+    setMinimizedTabs(prev => [...prev, newTab]);
+    setExpandedSite(siteId);
+  }
+}, [minimizedTabs, sites, handleRestore]);
+
+  const handleFullClose = useCallback(() => {
+    setExpandedSite(null);
+  }, []);
 
   const handleTabClose = useCallback((id: number) => {
     setMinimizedTabs(prev => {
       const newTabs = prev.filter(t => t.id !== id);
       
-      // Handle expanded state
       if (id === expandedSite) {
         if (newTabs.length > 0) {
-          // Find most recently used tab
           const mostRecentTab = newTabs.reduce((prev, current) => 
             (current.timestamp || 0) > (prev.timestamp || 0) ? current : prev
           );
@@ -429,59 +671,12 @@ const Dashboard = () => {
       
       return newTabs;
     });
+    
+    // cache clean up 2
+    tabCacheRef.current.delete(id);
   }, [expandedSite]);
 
-  const sites = useMemo(() => [
-    {
-      id: 1,
-      title: "MagicSwap",
-      description: "Coming Soon. Trade with the biggest advantage on ICP.",
-      url: "https://v2sro-viaaa-aaaap-ahftq-cai.icp0.io/"
-    },
-    {
-      id: 2,
-      title: "Uniswap",
-      description: "The biggest dex on ETH, now on the Internet Computer.",
-      url: "https://app.uniswap.org"
-    },
-    {
-      id: 3,
-      title: "Jupiter",
-      description: "The biggest dex on SOL, now on the Internet Computer.",
-      url: "https://jup.ag"
-    },
-    {
-      id: 4,
-      title: "PancakeSwap",
-      description: "The biggest dex on BNB, now on the Internet Computer.",
-      url: "https://pancakeswap.finance"
-    },
-    {
-      id: 5,
-      title: "launch.bob.fun",
-      description: "A token launchpad part of the bob.fun ecosystem.",
-      url: "https://launch.bob.fun"
-    },
-    {
-      id: 6,
-      title: "ICPEx",
-      description: "A memecoin dex on the Internet Computer.",
-      url: "https://icpex.org/exchange"
-    },
-    {
-      id: 7,
-      title: "ICLight.io",
-      description: "An orderbook dex on the Internet Computer.",
-      url: "https://iclight.io/ICDex/ckBTC/ICP"
-    },
-    {
-      id: 8,
-      title: "Bitfinity Bridge",
-      description: "Bridge ICP to Bitfinity and trade on multi-chain.",
-      url: "https://bitfinity.omnity.network/icp"
-    }
-  ], []);
-
+  // filtered sites
   const filteredSites = useMemo(() => 
     sites.filter(site => 
       site.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -489,6 +684,11 @@ const Dashboard = () => {
     ),
     [sites, searchQuery]
   );
+
+  // search
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#000000] relative">
@@ -515,25 +715,28 @@ const Dashboard = () => {
                 <input
                   type="text"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={handleSearchChange}
                   placeholder="Search apps..."
                   className="h-8 w-64 bg-[#0A0A0A] border border-purple-900/20 rounded-lg px-3 text-sm text-white/70 
                            placeholder:text-white/30 focus:outline-none focus:border-purple-500/50 focus:ring-0
                            hover:border-purple-500/30 transition-colors"
+                  aria-label="Search applications"
                 />
               </div>
               <a
-                href="https://github.com/MattiasICP/Shell-Router"
+                href="https://github.com/MattiasICP/ShellOS"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="h-8 w-8 flex items-center justify-center border border-purple-900/20 rounded-lg
                           text-white/70 hover:text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/30 
                           transition-all duration-300"
+                aria-label="View source on GitHub"
               >
                 <svg 
                   viewBox="0 0 24 24" 
                   className="h-4 w-4"
                   fill="currentColor"
+                  aria-hidden="true"
                 >
                   <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
                 </svg>
@@ -552,9 +755,11 @@ const Dashboard = () => {
                 onExpand={() => handleExpand(site.id)}
                 onClose={() => setExpandedSite(null)}
                 onMinimize={(iframeRef) => handleMinimize(site, iframeRef)}
+                onFullClose={handleFullClose}
                 minimizedTabs={minimizedTabs}
                 onTabClick={handleRestore}
                 onTabClose={handleTabClose}
+                isActiveTab={expandedSite === site.id}
               />
             ))}
           </div>
