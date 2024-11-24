@@ -31,7 +31,9 @@ ShellOS is lightwieght (main component is 780 lines including spacing) and was m
 
 1. Ctrl + F and search for "add more sites here"
 2. Scroll to the bottom of the const variable until you see the final app (id 10 at the time of writing this)
-3. Copy and paste the following code after the final entry ``` {
+3. Copy and paste the following code after the final entry
+   ```
+   {
       id: [ENTER ID NUMBER],
       title: "[ENTER APP NAME]",
       description: "[ENTER APP DESCRIPTION]",
