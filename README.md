@@ -1,6 +1,7 @@
-## Disclaimer! Use this app at your own risk! 
+![image](https://github.com/user-attachments/assets/dd996920-23dc-44d5-a52a-caa67b5276b6)
 
-# This app uses dapps outside of how they were normally designed. There may be unexpected behavior or interactions with apps that are outside of my control. I strongly recommend clicking the external link button to connect to the dapp directly when making large transactions.
+
+## Disclaimer! Use this app at your own risk!
 
 
 # Usage
