@@ -17,7 +17,7 @@ This is an experimental web app designed to trade with multiple dexes in one pla
 
 -some dapps don't like this style of embedding, icpswap and kong require a proxy server to access. coming soon TM until a sandbox is made.
 
--Uniswap and jupiter may have issues on mobile, desktop has worked better in my tests. If this occurs, I can recommend cross-chain on pancakeswap as I have had the least issues.
+-Uniswap and jupiter may have issues on mobile, desktop has worked better in my tests. This also may be browser dependant, if you run into issues more often than not using another browser can help.
 
 -For mobile use, I recommend a max of 2-3 tabs. Optimizing this further slows down the experience for more powerful devices.
 
