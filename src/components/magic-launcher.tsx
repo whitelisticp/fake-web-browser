@@ -64,7 +64,6 @@ const MinimizedTabs = ({
     [tabs]
   );
 
-  // Prevent pull-to-refresh when interacting with minimized tabs
   useEffect(() => {
     if (tabs.length > 0) {
       const tabsContainer = document.querySelector('.minimized-tabs-container');
@@ -124,7 +123,6 @@ const BrowserTabs = ({
     return tabs;
   }, [tabs, currentSite]);
 
-  // Prevent tab bar from scrolling the page on mobile
   useEffect(() => {
     const tabsContainer = document.querySelector('.browser-tabs-container');
     const preventDefault = (e: TouchEvent) => {
@@ -204,7 +202,6 @@ const ProjectCard = ({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const mountedRef = useRef(false);
 
-  // Maintain mounted state
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -487,7 +484,6 @@ const Dashboard = () => {
     };
   }, [minimizedTabs.length, expandedSite]);
 
-  // Enhanced tab persistence
   useEffect(() => {
     if (!mountedRef.current) {
       mountedRef.current = true;
@@ -514,7 +510,6 @@ const Dashboard = () => {
     }
   }, []);
 
-  // Save state with debounce
   useEffect(() => {
     const saveState = () => {
       try {
@@ -537,7 +532,7 @@ const Dashboard = () => {
     return () => clearTimeout(timeoutId);
   }, [minimizedTabs, expandedSite]);
 
-  // Sites data
+  // Add sites
   const sites = useMemo(() => [
     {
       id: 1,
@@ -600,7 +595,6 @@ const Dashboard = () => {
       url: "https://bioniq.io/home/24-hours"
     },
   ], []);
-  // Inside Dashboard component, continuing with handlers and render logic...
 
   const handleMinimize = useCallback((site: SiteData, iframeRef: React.RefObject<HTMLIFrameElement>) => {
     setMinimizedTabs(prev => {
