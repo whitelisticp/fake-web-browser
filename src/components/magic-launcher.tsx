@@ -47,18 +47,32 @@ interface SiteData {
   url: string;
 }
 
+const LoadingScreen = () => {
+  return (
+    <div className="fixed inset-0 bg-[#000000] flex items-center justify-center z-50 animate-fadeOut">
+      <div className="relative">
+        <div className="w-16 h-16 relative animate-scaleUp">
+          <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/20 to-purple-500/40 rounded-xl blur-xl animate-pulse" />
+          <div className="relative w-full h-full rounded-xl bg-[#0A0A0A] border border-purple-900/20 flex items-center justify-center">
+            <Command className="h-6 w-6 text-purple-400 animate-pulse" />
+          </div>
+        </div>
+        <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
+          <p className="text-sm text-purple-300/70 animate-pulse">
+            Loading ShellOS
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
 const LoadingSpinner = () => (
   <div className="absolute inset-0 flex items-center justify-center bg-[#030303]">
     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
   </div>
 );
-const MinimizedTabs = ({ 
-  tabs, 
-  onRestore 
-}: { 
-  tabs: MinimizedTab[];
-  onRestore: (tab: MinimizedTab) => void;
-}) => {
+
+const MinimizedTabs = ({ tabs, onRestore }: { tabs: MinimizedTab[]; onRestore: (tab: MinimizedTab) => void; }) => {
   const sortedTabs = useMemo(() => 
     [...tabs].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)),
     [tabs]
@@ -89,7 +103,8 @@ const MinimizedTabs = ({
                 onClick={() => onRestore(tab)}
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#0A0A0A] border border-purple-900/20 
                          hover:border-purple-500/30 hover:bg-purple-500/10 transition-all duration-300 group
-                         animate-slideUp whitespace-nowrap cursor-pointer"
+                         animate-slideIn whitespace-nowrap cursor-pointer"
+                style={{ animationDelay: '100ms' }}
               >
                 <div className="h-1.5 w-1.5 rounded-full bg-purple-500/70 group-hover:bg-purple-400 transition-colors" />
                 <span className="text-sm text-purple-300/70 group-hover:text-purple-300 transition-colors">
@@ -103,6 +118,7 @@ const MinimizedTabs = ({
     </div>
   );
 };
+
 const BrowserTabs = ({ 
   activeTab, 
   tabs, 
@@ -137,8 +153,8 @@ const BrowserTabs = ({
 
   return (
     <div className="flex-1 overflow-x-auto scrollbar-hide browser-tabs-container">
-      <div className="flex items-center gap-1 min-w-max px-1">
-        {allTabs.map((tab) => {
+      <div className="flex items-center gap-1 min-w-max px-1 bg-[#030303]">
+        {allTabs.map((tab, index) => {
           const isActive = activeTab === tab.id;
           const uniqueKey = `browser-tab-${tab.id}-${isActive ? 'active' : 'inactive'}`;
           
@@ -180,6 +196,7 @@ const BrowserTabs = ({
     </div>
   );
 };
+
 const ProjectCard = ({ 
   title, 
   description, 
@@ -208,6 +225,7 @@ const ProjectCard = ({
       mountedRef.current = false;
     };
   }, []);
+
   useEffect(() => {
     if (!mountedRef.current) return;
 
@@ -236,7 +254,7 @@ const ProjectCard = ({
           e.preventDefault();
         }
       };
-  
+
       document.body.style.overscrollBehavior = 'none';
       document.addEventListener('touchmove', preventDefault, { passive: false });
       
@@ -297,9 +315,14 @@ const ProjectCard = ({
       }}
     >
       <DialogContent 
-  className="max-w-[100vw] w-[100vw] h-[100dvh] p-0 bg-[#030303] border-0 rounded-none animate-dialogSlideIn"
-  onPointerDownOutside={(e) => e.preventDefault()}
-  onInteractOutside={(e) => e.preventDefault()}
+        className={cn(
+          "max-w-[100vw] w-[100vw] h-[100dvh] p-0 bg-[#030303] border-0 rounded-none",
+          "transform transition-all duration-300",
+          "data-[state=open]:animate-dialogSlideIn",
+          "data-[state=closed]:animate-dialogSlideOut"
+        )}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <div className="flex flex-col h-full">
@@ -339,24 +362,25 @@ const ProjectCard = ({
             </div>
           </div>
           <main className="flex-1 bg-[#030303] relative">
-  {isLoading && <LoadingSpinner />}
-  {isVisible && (
-    <iframe 
-      ref={iframeRef}
-      src={url} 
-      className={cn(
-        "absolute inset-0 w-full h-full border-0",
-        isLoading && "opacity-0"
-      )}
-      allow="fullscreen"
-      onLoad={handleIframeLoad}
-      title={title}
-      style={{
-        WebkitOverflowScrolling: 'touch'
-      }}
-    />
-  )}
-</main>
+            <div className="absolute inset-0 bg-[#030303] z-0" />
+            {isLoading && <LoadingSpinner />}
+            {isVisible && (
+              <iframe 
+                ref={iframeRef}
+                src={url} 
+                className={cn(
+                  "absolute inset-0 w-full h-full border-0 z-10",
+                  isLoading && "opacity-0"
+                )}
+                allow="fullscreen"
+                onLoad={handleIframeLoad}
+                title={title}
+                style={{
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              />
+            )}
+          </main>
         </div>
       </DialogContent>
     </Dialog>
@@ -469,9 +493,17 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [minimizedTabs, setMinimizedTabs] = useState<MinimizedTab[]>([]);
   const [expandedSite, setExpandedSite] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const mountedRef = useRef(false);
 
-  // Prevent unwanted page reloads
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     const preventReload = (e: BeforeUnloadEvent) => {
       if (minimizedTabs.length > 0 || expandedSite !== null) {
@@ -487,7 +519,6 @@ const Dashboard = () => {
     };
   }, [minimizedTabs.length, expandedSite]);
 
-  // Enhanced tab persistence
   useEffect(() => {
     if (!mountedRef.current) {
       mountedRef.current = true;
@@ -500,7 +531,7 @@ const Dashboard = () => {
           const hydratedTabs = parsedTabs.map((tab: any) => ({
             ...tab,
             iframeRef: React.createRef(),
-            timestamp: Date.now() // Refresh timestamps on reload
+            timestamp: Date.now()
           }));
           setMinimizedTabs(hydratedTabs);
         }
@@ -536,7 +567,6 @@ const Dashboard = () => {
     return () => clearTimeout(timeoutId);
   }, [minimizedTabs, expandedSite]);
 
-  // Sites data
   const sites = useMemo(() => [
     {
       id: 1,
@@ -599,7 +629,6 @@ const Dashboard = () => {
       url: "https://bioniq.io/home/24-hours"
     },
   ], []);
-
   const handleMinimize = useCallback((site: SiteData, iframeRef: React.RefObject<HTMLIFrameElement>) => {
     setMinimizedTabs(prev => {
       const existingTabIndex = prev.findIndex(tab => tab.id === site.id);
@@ -719,89 +748,95 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#000000] relative">
-      <div className="fixed inset-0">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f05_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f05_1px,transparent_1px)] bg-[size:14px_24px]" />
-        <div className="absolute inset-0 bg-gradient-to-tr from-purple-900/[0.02] via-transparent to-purple-900/[0.02]" />
-      </div>
-
-      <div className="relative min-h-screen">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-          <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 sm:h-14 gap-4 sm:gap-0">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-[#0A0A0A] border border-purple-900/20 flex items-center justify-center group">
-                <Command className="h-4 w-4 text-purple-400 group-hover:text-purple-300 transition-colors" />
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold text-white">ShellOS</h1>
-                <p className="text-xs text-white/50">by MCS</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="relative flex-1 sm:flex-initial">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={handleSearchChange}
-                  placeholder="Search apps..."
-                  className="h-8 w-full sm:w-48 md:w-64 bg-[#0A0A0A] border border-purple-900/20 rounded-lg px-3 text-sm text-white/70 
-                           placeholder:text-white/30 focus:outline-none focus:border-purple-500/50 focus:ring-0
-                           hover:border-purple-500/30 transition-colors"
-                  aria-label="Search applications"
-                />
-              </div>
-              <a
-                href="https://github.com/MattiasICP/ShellOS"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="h-8 w-8 flex-shrink-0 flex items-center justify-center border border-purple-900/20 rounded-lg
-                          text-white/70 hover:text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/30 
-                          transition-all duration-300"
-                aria-label="View source on GitHub"
-              >
-                <svg 
-                  viewBox="0 0 24 24" 
-                  className="h-4 w-4"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
-                </svg>
-              </a>
-            </div>
-          </header>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
-            {filteredSites.map((site: SiteData, index: number) => (
-              <ProjectCard
-                key={`site-${site.id}`}
-                {...site}
-                id={site.id}
-                index={index}
-                expanded={expandedSite === site.id}
-                onExpand={() => handleExpand(site.id)}
-                onClose={() => setExpandedSite(null)}
-                onMinimize={(iframeRef) => handleMinimize(site, iframeRef)}
-                onFullClose={handleFullClose}
-                minimizedTabs={minimizedTabs}
-                onTabClick={handleRestore}
-                onTabClose={handleTabClose}
-                isActiveTab={expandedSite === site.id}
-              />
-            ))}
-          </div>
+    <>
+      {isLoading && <LoadingScreen />}
+      <div className={cn(
+        "min-h-screen bg-[#000000] relative pb-14",
+        isLoading ? 'opacity-0' : 'animate-scaleIn'
+      )}>
+        <div className="fixed inset-0">
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f05_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f05_1px,transparent_1px)] bg-[size:14px_24px]" />
+          <div className="absolute inset-0 bg-gradient-to-tr from-purple-900/[0.02] via-transparent to-purple-900/[0.02]" />
         </div>
 
-        {minimizedTabs.length > 0 && (
-          <MinimizedTabs 
-            tabs={minimizedTabs} 
-            onRestore={handleRestore}
-          />
-        )}
-        <Footer />
+        <div className="relative min-h-screen">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 sm:h-14 gap-4 sm:gap-0">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-[#0A0A0A] border border-purple-900/20 flex items-center justify-center group">
+                  <Command className="h-4 w-4 text-purple-400 group-hover:text-purple-300 transition-colors" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-semibold text-white">ShellOS</h1>
+                  <p className="text-xs text-white/50">by MCS</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="relative flex-1 sm:flex-initial">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    placeholder="Search apps..."
+                    className="h-8 w-full sm:w-48 md:w-64 bg-[#0A0A0A] border border-purple-900/20 rounded-lg px-3 text-sm text-white/70 
+                             placeholder:text-white/30 focus:outline-none focus:border-purple-500/50 focus:ring-0
+                             hover:border-purple-500/30 transition-colors"
+                    aria-label="Search applications"
+                  />
+                </div>
+                <a
+                  href="https://github.com/MattiasICP/ShellOS"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-8 w-8 flex-shrink-0 flex items-center justify-center border border-purple-900/20 rounded-lg
+                            text-white/70 hover:text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/30 
+                            transition-all duration-300"
+                  aria-label="View source on GitHub"
+                >
+                  <svg 
+                    viewBox="0 0 24 24" 
+                    className="h-4 w-4"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+                  </svg>
+                </a>
+              </div>
+            </header>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
+              {filteredSites.map((site: SiteData, index: number) => (
+                <ProjectCard
+                  key={`site-${site.id}`}
+                  {...site}
+                  id={site.id}
+                  index={index}
+                  expanded={expandedSite === site.id}
+                  onExpand={() => handleExpand(site.id)}
+                  onClose={() => setExpandedSite(null)}
+                  onMinimize={(iframeRef) => handleMinimize(site, iframeRef)}
+                  onFullClose={handleFullClose}
+                  minimizedTabs={minimizedTabs}
+                  onTabClick={handleRestore}
+                  onTabClose={handleTabClose}
+                  isActiveTab={expandedSite === site.id}
+                />
+              ))}
+            </div>
+          </div>
+
+          {minimizedTabs.length > 0 && (
+            <MinimizedTabs 
+              tabs={minimizedTabs} 
+              onRestore={handleRestore}
+            />
+          )}
+        </div>
       </div>
-    </div>
+      <Footer />
+    </>
   );
 };
 
