@@ -48,14 +48,12 @@ interface SiteData {
   url: string;
 }
 
-// this sucks
 const LoadingSpinner = () => (
   <div className="absolute inset-0 flex items-center justify-center bg-[#030303]">
     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
   </div>
 );
 
-// minimizes tabs, but does not handle the stuff inside minimized tabs on its own
 const MinimizedTabs = ({ 
   tabs, 
   onRestore 
@@ -94,7 +92,6 @@ const MinimizedTabs = ({
   );
 };
 
-// doesn't handle minimizing, handles the tabs only because this shit was annoying as fuck in one spot
 const BrowserTabs = ({ 
   activeTab, 
   tabs, 
@@ -109,12 +106,9 @@ const BrowserTabs = ({
   onTabClose: (id: number) => void;
 }) => {
   const allTabs = useMemo(() => {
-    // Return just tabs if no current site or if site is already in tabs
     if (!currentSite || tabs.some(tab => tab.id === currentSite.id)) {
       return tabs;
     }
-
-    // I removed what I thought was a crucial piece of code here by accident but absolutely nothing happened
     return tabs;
   }, [tabs, currentSite]);
 
@@ -185,7 +179,6 @@ const ProjectCard = ({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const cacheRef = useRef<TabCache[]>([]);
 
-  // load management with cache
   useEffect(() => {
     if (expanded || (isHovered && !isLoaded)) {
       const cachedTab = cacheRef.current.find(t => t.id === id);
@@ -201,8 +194,6 @@ const ProjectCard = ({
           isLoaded: true,
           lastAccessed: Date.now()
         });
-
-        // Limit cache size (keep last 5 accessed tabs, i tried 8 and my phone felt like it was going to explode)
         if (cacheRef.current.length > 5) {
           cacheRef.current.sort((a, b) => b.lastAccessed - a.lastAccessed);
           cacheRef.current = cacheRef.current.slice(0, 5);
@@ -211,7 +202,6 @@ const ProjectCard = ({
     }
   }, [expanded, isHovered, id]);
 
-  // cleanup cache
   useEffect(() => {
     const cleanup = () => {
       const now = Date.now();
@@ -245,7 +235,6 @@ const ProjectCard = ({
     return proxyUrl;
   };
 
-  // window close handler because this shit refused to work properly for a day
   const handleWindowClose = useCallback(() => {
     if (minimizedTabs.length > 0) {
       const otherTabs = minimizedTabs.filter(tab => tab.id !== id);
@@ -253,23 +242,18 @@ const ProjectCard = ({
         const mostRecentTab = otherTabs.reduce((prev, current) => 
           (current.timestamp || 0) > (prev.timestamp || 0) ? current : prev
         );
-        // First switch to the next tab
         onTabClick(mostRecentTab);
-        // Then close the current tab
         onTabClose(id);
       } else {
-        // If this is the last tab, close it and go home
         onTabClose(id);
         onFullClose();
       }
     } else {
-      // If no tabs at all, just close
       onClose();
       onFullClose();
     }
   }, [minimizedTabs, id, onTabClick, onTabClose, onClose, onFullClose]);
 
-  // grab current site data with cache info
   const currentSite = useMemo(() => ({
     id,
     title,
@@ -278,7 +262,6 @@ const ProjectCard = ({
     cache: cacheRef.current.find(t => t.id === id)
   }), [id, title, description, url]);
 
-  // guess iframe visibility
   const isVisible = expanded || (isHovered && isLoaded);
 
   return expanded ? (
@@ -291,13 +274,13 @@ const ProjectCard = ({
       }}
     >
       <DialogContent 
-        className="max-w-[100vw] w-[100vw] h-[100vh] p-0 bg-[#030303] border-0 rounded-none animate-dialogSlideIn"
+        className="max-w-[100vw] w-[100vw] h-[100dvh] p-0 bg-[#030303] border-0 rounded-none animate-dialogSlideIn"
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <div className="flex flex-col h-full">
-          <div className="flex items-center justify-between h-8 bg-[#030303] border-b border-purple-900/20">
+          <div className="sticky top-0 flex items-center justify-between h-8 bg-[#030303] border-b border-purple-900/20 z-50">
             <BrowserTabs
               activeTab={id}
               tabs={minimizedTabs}
@@ -548,7 +531,6 @@ const Dashboard = () => {
     }
   }, []);
 
-  // Save state
   useEffect(() => {
     try {
       const tabsToSave = minimizedTabs.map(({ id, title, url, description, timestamp }) => 
@@ -613,7 +595,7 @@ const Dashboard = () => {
           ...t, 
           timestamp,
           cache: {
-            id: t.id,  // this took a straight hour to fix btw
+            id: t.id,  // this is so shit and has issues change cache system in v2
             isLoaded: true,
             lastAccessed: timestamp
           }
@@ -630,7 +612,6 @@ const handleExpand = useCallback((siteId: number) => {
   if (existingTab) {
     handleRestore(existingTab);
   } else if (targetSite) {
-    // initialize the tab first, then expand it
     const newTab: MinimizedTab = {
       id: targetSite.id,
       title: targetSite.title,
@@ -672,11 +653,10 @@ const handleExpand = useCallback((siteId: number) => {
       return newTabs;
     });
     
-    // cache clean up 2
+    // cache clean up 2 hahaha or else ur shit will blow the fuck up
     tabCacheRef.current.delete(id);
   }, [expandedSite]);
 
-  // filtered sites
   const filteredSites = useMemo(() => 
     sites.filter(site => 
       site.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -699,7 +679,7 @@ const handleExpand = useCallback((siteId: number) => {
 
       <div className="relative min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-          <header className="flex justify-between items-center h-14">
+          <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 sm:h-14 gap-4 sm:gap-0">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-[#0A0A0A] border border-purple-900/20 flex items-center justify-center group">
                 <Command className="h-4 w-4 text-purple-400 group-hover:text-purple-300 transition-colors" />
@@ -710,14 +690,14 @@ const handleExpand = useCallback((siteId: number) => {
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="relative">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="relative flex-1 sm:flex-initial">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={handleSearchChange}
                   placeholder="Search apps..."
-                  className="h-8 w-64 bg-[#0A0A0A] border border-purple-900/20 rounded-lg px-3 text-sm text-white/70 
+                  className="h-8 w-full sm:w-48 md:w-64 bg-[#0A0A0A] border border-purple-900/20 rounded-lg px-3 text-sm text-white/70 
                            placeholder:text-white/30 focus:outline-none focus:border-purple-500/50 focus:ring-0
                            hover:border-purple-500/30 transition-colors"
                   aria-label="Search applications"
@@ -727,7 +707,7 @@ const handleExpand = useCallback((siteId: number) => {
                 href="https://github.com/MattiasICP/ShellOS"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="h-8 w-8 flex items-center justify-center border border-purple-900/20 rounded-lg
+                className="h-8 w-8 flex-shrink-0 flex items-center justify-center border border-purple-900/20 rounded-lg
                           text-white/70 hover:text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/30 
                           transition-all duration-300"
                 aria-label="View source on GitHub"
