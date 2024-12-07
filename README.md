@@ -26,7 +26,7 @@ npm run dev to run it locally
 
 # For devs
 
-ShellOS is lightwieght (main component is 780 lines including spacing) and was made in nextjs 15 + react 19. You can add this entire app to your app by adding <MagicLaucher /> to your page.tsx or other main component file. The design of having this entire app in a single component is highly questionable, however I found that it makes is actually quite nice to work with in other projects since you can put it into a tab, seperate page, and only need to edit a few lines of code to add or remove websites.
+ShellOS is lightwieght (main component is 780 lines including spacing) and was made in nextjs 15 + react 19. You can add this entire app to your app by adding "MagicLaucher" in a self-closing tag to your page.tsx or other main component file. The design of having this entire app in a single component is highly questionable, however this may be changed.
 
 # How to add or remove apps
 
@@ -39,7 +39,7 @@ ShellOS is lightwieght (main component is 780 lines including spacing) and was m
       title: "[ENTER APP NAME]",
       description: "[ENTER APP DESCRIPTION]",
       url: "[PASTE DAPP URL]"
-    },
+   },
    ```
 5. Change the id to be +1 of the final ID (ig. if the final id is 10, change this entry to 11)
 6. Add your name, description, and URL.
