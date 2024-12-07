@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-// there are better ways to store this, but i am not going to fix it, nor am i going to elaborate
+// there are better ways to store this probably
 interface TabCache {
   id: number;
   isLoaded: boolean;
@@ -467,7 +467,7 @@ const Dashboard = () => {
       id: 1,
       title: "Uniswap",
       description: "The biggest dex on the Ethereum network.",
-      url: "https://app.uniswap.org"
+      url: "https://app.uniswap.org/swap?chain=mainnet&inputCurrency=NATIVE"
     },
     {
       id: 2,
