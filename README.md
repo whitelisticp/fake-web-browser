@@ -1,7 +1,7 @@
 ![image](https://github.com/user-attachments/assets/dd996920-23dc-44d5-a52a-caa67b5276b6)
 
 
-## Disclaimer! Use this app at your own risk!
+## Disclaimer: This is in beta! Use this app at your own risk! Please use the pop-out feature when making large trades: ![image](https://github.com/user-attachments/assets/6bccf77e-1665-483a-829d-fefcc5d5fb09)
 
 
 # Usage
@@ -9,8 +9,8 @@ This is an experimental web app designed to trade with multiple dexes in one pla
 
 # Setup
 
-npm install @ source directory
-npm run dev to run it locally
+-npm install @ source directory
+-npm run dev to run it locally
 
 # known issues/notes
 
