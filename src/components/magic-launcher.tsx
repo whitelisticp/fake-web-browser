@@ -208,8 +208,6 @@ const ProjectCard = ({
       mountedRef.current = false;
     };
   }, []);
-
-  // Improved load management
   useEffect(() => {
     if (!mountedRef.current) return;
 
@@ -219,20 +217,26 @@ const ProjectCard = ({
     }
   }, [expanded, isHovered, isLoaded]);
 
-  // Enhanced iframe load handler
   const handleIframeLoad = useCallback(() => {
     if (!mountedRef.current) return;
     setIsLoading(false);
   }, []);
 
-  // Prevent mobile scroll/reload issues
   useEffect(() => {
     if (expanded) {
       const preventDefault = (e: Event) => {
-        e.preventDefault();
+        const iframe = iframeRef.current;
+        if (!iframe) return;
+        
+        const touchY = (e as TouchEvent).touches[0].clientY;
+        const isAtTop = iframe.scrollTop <= 0;
+        const isAtBottom = iframe.scrollTop + iframe.clientHeight >= iframe.scrollHeight;
+        
+        if ((isAtTop && touchY > 0) || (isAtBottom && touchY < 0)) {
+          e.preventDefault();
+        }
       };
-
-      // Prevent pull-to-refresh behavior
+  
       document.body.style.overscrollBehavior = 'none';
       document.addEventListener('touchmove', preventDefault, { passive: false });
       
@@ -293,9 +297,9 @@ const ProjectCard = ({
       }}
     >
       <DialogContent 
-        className="max-w-[100vw] w-[100vw] h-[100dvh] p-0 bg-[#030303] border-0 rounded-none animate-dialogSlideIn overflow-hidden"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onInteractOutside={(e) => e.preventDefault()}
+  className="max-w-[100vw] w-[100vw] h-[100dvh] p-0 bg-[#030303] border-0 rounded-none animate-dialogSlideIn"
+  onPointerDownOutside={(e) => e.preventDefault()}
+  onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogTitle className="sr-only">{title}</DialogTitle>
         <div className="flex flex-col h-full">
@@ -334,26 +338,25 @@ const ProjectCard = ({
               </Button>
             </div>
           </div>
-          <main className="flex-1 bg-[#030303] relative overflow-hidden">
-            {isLoading && <LoadingSpinner />}
-            {isVisible && (
-              <iframe 
-                ref={iframeRef}
-                src={url} 
-                className={cn(
-                  "absolute inset-0 w-full h-full border-0",
-                  isLoading && "opacity-0"
-                )}
-                allow="fullscreen"
-                onLoad={handleIframeLoad}
-                title={title}
-                style={{
-                  WebkitOverflowScrolling: 'touch',
-                  overscrollBehavior: 'none'
-                }}
-              />
-            )}
-          </main>
+          <main className="flex-1 bg-[#030303] relative">
+  {isLoading && <LoadingSpinner />}
+  {isVisible && (
+    <iframe 
+      ref={iframeRef}
+      src={url} 
+      className={cn(
+        "absolute inset-0 w-full h-full border-0",
+        isLoading && "opacity-0"
+      )}
+      allow="fullscreen"
+      onLoad={handleIframeLoad}
+      title={title}
+      style={{
+        WebkitOverflowScrolling: 'touch'
+      }}
+    />
+  )}
+</main>
         </div>
       </DialogContent>
     </Dialog>
@@ -484,6 +487,7 @@ const Dashboard = () => {
     };
   }, [minimizedTabs.length, expandedSite]);
 
+  // Enhanced tab persistence
   useEffect(() => {
     if (!mountedRef.current) {
       mountedRef.current = true;
@@ -532,7 +536,7 @@ const Dashboard = () => {
     return () => clearTimeout(timeoutId);
   }, [minimizedTabs, expandedSite]);
 
-  // Add sites
+  // Sites data
   const sites = useMemo(() => [
     {
       id: 1,
@@ -715,7 +719,7 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#000000] relative overflow-hidden touch-none">
+    <div className="min-h-screen bg-[#000000] relative">
       <div className="fixed inset-0">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f05_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f05_1px,transparent_1px)] bg-[size:14px_24px]" />
         <div className="absolute inset-0 bg-gradient-to-tr from-purple-900/[0.02] via-transparent to-purple-900/[0.02]" />
