@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-// there are better ways to store this probably
 interface TabCache {
   id: number;
   isLoaded: boolean;
@@ -53,7 +52,6 @@ const LoadingSpinner = () => (
     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
   </div>
 );
-
 const MinimizedTabs = ({ 
   tabs, 
   onRestore 
@@ -66,10 +64,25 @@ const MinimizedTabs = ({
     [tabs]
   );
 
+  // Prevent pull-to-refresh when interacting with minimized tabs
+  useEffect(() => {
+    if (tabs.length > 0) {
+      const tabsContainer = document.querySelector('.minimized-tabs-container');
+      const preventDefault = (e: Event) => {
+        e.preventDefault();
+      };
+
+      tabsContainer?.addEventListener('touchmove', preventDefault, { passive: false });
+      return () => {
+        tabsContainer?.removeEventListener('touchmove', preventDefault);
+      };
+    }
+  }, [tabs.length]);
+
   return (
     <div className="fixed bottom-14 left-0 right-0 bg-[#030303]/95 backdrop-blur-sm border-t border-purple-900/20 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="h-10 flex items-center gap-2 overflow-x-auto scrollbar-hide">
+        <div className="h-10 flex items-center gap-2 overflow-x-auto scrollbar-hide minimized-tabs-container">
           <div className="flex flex-nowrap gap-2 px-2">
             {sortedTabs.map((tab) => (
               <div
@@ -91,7 +104,6 @@ const MinimizedTabs = ({
     </div>
   );
 };
-
 const BrowserTabs = ({ 
   activeTab, 
   tabs, 
@@ -112,8 +124,21 @@ const BrowserTabs = ({
     return tabs;
   }, [tabs, currentSite]);
 
+  // Prevent tab bar from scrolling the page on mobile
+  useEffect(() => {
+    const tabsContainer = document.querySelector('.browser-tabs-container');
+    const preventDefault = (e: TouchEvent) => {
+      e.preventDefault();
+    };
+
+    tabsContainer?.addEventListener('touchmove', preventDefault as EventListener, { passive: false });
+    return () => {
+      tabsContainer?.removeEventListener('touchmove', preventDefault as EventListener);
+    };
+  }, []);
+
   return (
-    <div className="flex-1 overflow-x-auto scrollbar-hide">
+    <div className="flex-1 overflow-x-auto scrollbar-hide browser-tabs-container">
       <div className="flex items-center gap-1 min-w-max px-1">
         {allTabs.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -124,7 +149,7 @@ const BrowserTabs = ({
               key={uniqueKey}
               className={cn(
                 "flex items-center gap-2 px-2 py-1 min-w-[100px] max-w-[160px] h-7 border-r border-l border-t rounded-t-md border-purple-900/20",
-                "hover:bg-purple-500/5 transition-all duration-300 group relative",
+                "hover:bg-purple-500/5 transition-all duration-300 group relative select-none",
                 isActive ? "bg-[#0A0A0A] border-purple-500/20" : "bg-[#030303]"
               )}
             >
@@ -177,51 +202,49 @@ const ProjectCard = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const cacheRef = useRef<TabCache[]>([]);
+  const mountedRef = useRef(false);
 
+  // Maintain mounted state
   useEffect(() => {
-    if (expanded || (isHovered && !isLoaded)) {
-      const cachedTab = cacheRef.current.find(t => t.id === id);
-      if (cachedTab) {
-        setIsLoaded(true);
-        setIsLoading(false);
-        cachedTab.lastAccessed = Date.now();
-      } else {
-        setIsLoading(true);
-        setIsLoaded(true);
-        cacheRef.current.push({
-          id,
-          isLoaded: true,
-          lastAccessed: Date.now()
-        });
-        if (cacheRef.current.length > 5) {
-          cacheRef.current.sort((a, b) => b.lastAccessed - a.lastAccessed);
-          cacheRef.current = cacheRef.current.slice(0, 5);
-        }
-      }
-    }
-  }, [expanded, isHovered, id]);
-
-  useEffect(() => {
-    const cleanup = () => {
-      const now = Date.now();
-      cacheRef.current = cacheRef.current.filter(
-        tab => now - tab.lastAccessed < 300000 // 5 minutes
-      );
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
     };
-
-    const interval = setInterval(cleanup, 60000); // Every minute
-    return () => clearInterval(interval);
   }, []);
 
-  // load handler (for iframe)
-  const handleIframeLoad = useCallback(() => {
-    setIsLoading(false);
-    const cachedTab = cacheRef.current.find(t => t.id === id);
-    if (cachedTab) {
-      cachedTab.lastAccessed = Date.now();
+  // Improved load management
+  useEffect(() => {
+    if (!mountedRef.current) return;
+
+    if (expanded || (isHovered && !isLoaded)) {
+      setIsLoading(true);
+      setIsLoaded(true);
     }
-  }, [id]);
+  }, [expanded, isHovered, isLoaded]);
+
+  // Enhanced iframe load handler
+  const handleIframeLoad = useCallback(() => {
+    if (!mountedRef.current) return;
+    setIsLoading(false);
+  }, []);
+
+  // Prevent mobile scroll/reload issues
+  useEffect(() => {
+    if (expanded) {
+      const preventDefault = (e: Event) => {
+        e.preventDefault();
+      };
+
+      // Prevent pull-to-refresh behavior
+      document.body.style.overscrollBehavior = 'none';
+      document.addEventListener('touchmove', preventDefault, { passive: false });
+      
+      return () => {
+        document.body.style.overscrollBehavior = 'auto';
+        document.removeEventListener('touchmove', preventDefault);
+      };
+    }
+  }, [expanded]);
 
   const getExternalUrl = (proxyUrl: string) => {
     if (proxyUrl.startsWith('/api/proxy/')) {
@@ -258,8 +281,7 @@ const ProjectCard = ({
     id,
     title,
     description,
-    url,
-    cache: cacheRef.current.find(t => t.id === id)
+    url
   }), [id, title, description, url]);
 
   const isVisible = expanded || (isHovered && isLoaded);
@@ -274,7 +296,7 @@ const ProjectCard = ({
       }}
     >
       <DialogContent 
-        className="max-w-[100vw] w-[100vw] h-[100dvh] p-0 bg-[#030303] border-0 rounded-none animate-dialogSlideIn"
+        className="max-w-[100vw] w-[100vw] h-[100dvh] p-0 bg-[#030303] border-0 rounded-none animate-dialogSlideIn overflow-hidden"
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
       >
@@ -315,20 +337,25 @@ const ProjectCard = ({
               </Button>
             </div>
           </div>
-          <main className="flex-1 bg-[#030303] relative">
+          <main className="flex-1 bg-[#030303] relative overflow-hidden">
             {isLoading && <LoadingSpinner />}
-            <iframe 
-              ref={iframeRef}
-              src={url} 
-              className={cn(
-                "absolute inset-0 w-full h-full border-0",
-                !isVisible && "hidden",
-                isLoading && "opacity-0"
-              )}
-              allow="fullscreen"
-              onLoad={handleIframeLoad}
-              title={title}
-            />
+            {isVisible && (
+              <iframe 
+                ref={iframeRef}
+                src={url} 
+                className={cn(
+                  "absolute inset-0 w-full h-full border-0",
+                  isLoading && "opacity-0"
+                )}
+                allow="fullscreen"
+                onLoad={handleIframeLoad}
+                title={title}
+                style={{
+                  WebkitOverflowScrolling: 'touch',
+                  overscrollBehavior: 'none'
+                }}
+              />
+            )}
           </main>
         </div>
       </DialogContent>
@@ -442,9 +469,75 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [minimizedTabs, setMinimizedTabs] = useState<MinimizedTab[]>([]);
   const [expandedSite, setExpandedSite] = useState<number | null>(null);
-  const tabCacheRef = useRef<Map<number, TabCache>>(new Map());
+  const mountedRef = useRef(false);
 
-  // add more sites here
+  // Prevent unwanted page reloads
+  useEffect(() => {
+    const preventReload = (e: BeforeUnloadEvent) => {
+      if (minimizedTabs.length > 0 || expandedSite !== null) {
+        e.preventDefault();
+        return (e.returnValue = '');
+      }
+    };
+
+    window.addEventListener('beforeunload', preventReload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', preventReload);
+    };
+  }, [minimizedTabs.length, expandedSite]);
+
+  // Enhanced tab persistence
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      try {
+        const savedTabs = localStorage.getItem('shellOS-tabs');
+        const savedExpandedSite = localStorage.getItem('shellOS-expandedSite');
+        
+        if (savedTabs) {
+          const parsedTabs = JSON.parse(savedTabs);
+          const hydratedTabs = parsedTabs.map((tab: any) => ({
+            ...tab,
+            iframeRef: React.createRef(),
+            timestamp: Date.now() // Refresh timestamps on reload
+          }));
+          setMinimizedTabs(hydratedTabs);
+        }
+        
+        if (savedExpandedSite) {
+          setExpandedSite(Number(savedExpandedSite));
+        }
+      } catch (error) {
+        console.error('Error restoring tabs:', error);
+      }
+    }
+  }, []);
+
+  // Save state with debounce
+  useEffect(() => {
+    const saveState = () => {
+      try {
+        const tabsToSave = minimizedTabs.map(({ id, title, url, description, timestamp }) => 
+          ({ id, title, url, description, timestamp })
+        );
+        localStorage.setItem('shellOS-tabs', JSON.stringify(tabsToSave));
+        
+        if (expandedSite) {
+          localStorage.setItem('shellOS-expandedSite', expandedSite.toString());
+        } else {
+          localStorage.removeItem('shellOS-expandedSite');
+        }
+      } catch (error) {
+        console.error('Error saving tabs:', error);
+      }
+    };
+
+    const timeoutId = setTimeout(saveState, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [minimizedTabs, expandedSite]);
+
+  // Sites data
   const sites = useMemo(() => [
     {
       id: 1,
@@ -507,46 +600,7 @@ const Dashboard = () => {
       url: "https://bioniq.io/home/24-hours"
     },
   ], []);
-
-  // Tab persistence
-  useEffect(() => {
-    try {
-      const savedTabs = localStorage.getItem('shellOS-tabs');
-      const savedExpandedSite = localStorage.getItem('shellOS-expandedSite');
-      
-      if (savedTabs) {
-        const parsedTabs = JSON.parse(savedTabs);
-        setMinimizedTabs(parsedTabs.map((tab: any) => ({
-          ...tab,
-          iframeRef: React.createRef(),
-          cache: tabCacheRef.current.get(tab.id)
-        })));
-      }
-      
-      if (savedExpandedSite) {
-        setExpandedSite(Number(savedExpandedSite));
-      }
-    } catch (error) {
-      console.error('Error restoring tabs:', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      const tabsToSave = minimizedTabs.map(({ id, title, url, description, timestamp }) => 
-        ({ id, title, url, description, timestamp })
-      );
-      localStorage.setItem('shellOS-tabs', JSON.stringify(tabsToSave));
-      
-      if (expandedSite) {
-        localStorage.setItem('shellOS-expandedSite', expandedSite.toString());
-      } else {
-        localStorage.removeItem('shellOS-expandedSite');
-      }
-    } catch (error) {
-      console.error('Error saving tabs:', error);
-    }
-  }, [minimizedTabs, expandedSite]);
+  // Inside Dashboard component, continuing with handlers and render logic...
 
   const handleMinimize = useCallback((site: SiteData, iframeRef: React.RefObject<HTMLIFrameElement>) => {
     setMinimizedTabs(prev => {
@@ -589,47 +643,47 @@ const Dashboard = () => {
 
   const handleRestore = useCallback((tab: MinimizedTab) => {
     const timestamp = Date.now();
-  setMinimizedTabs(prev => prev.map(t => 
-    t.id === tab.id 
-      ? { 
-          ...t, 
-          timestamp,
-          cache: {
-            id: t.id,  // this is so shit and has issues change cache system in v2
-            isLoaded: true,
-            lastAccessed: timestamp
-          }
-        } 
-      : t
-  ));
-  setExpandedSite(tab.id);
-}, []);
+    setMinimizedTabs(prev => prev.map(t => 
+      t.id === tab.id 
+        ? { 
+            ...t, 
+            timestamp,
+            cache: {
+              id: t.id,
+              isLoaded: true,
+              lastAccessed: timestamp
+            }
+          } 
+        : t
+    ));
+    setExpandedSite(tab.id);
+  }, []);
 
-const handleExpand = useCallback((siteId: number) => {
-  const existingTab = minimizedTabs.find(tab => tab.id === siteId);
-  const targetSite = sites.find(site => site.id === siteId);
+  const handleExpand = useCallback((siteId: number) => {
+    const existingTab = minimizedTabs.find(tab => tab.id === siteId);
+    const targetSite = sites.find(site => site.id === siteId);
 
-  if (existingTab) {
-    handleRestore(existingTab);
-  } else if (targetSite) {
-    const newTab: MinimizedTab = {
-      id: targetSite.id,
-      title: targetSite.title,
-      url: targetSite.url,
-      description: targetSite.description,
-      iframeRef: { current: null },
-      timestamp: Date.now(),
-      cache: {
+    if (existingTab) {
+      handleRestore(existingTab);
+    } else if (targetSite) {
+      const newTab: MinimizedTab = {
         id: targetSite.id,
-        isLoaded: true,
-        lastAccessed: Date.now()
-      }
-    };
-    
-    setMinimizedTabs(prev => [...prev, newTab]);
-    setExpandedSite(siteId);
-  }
-}, [minimizedTabs, sites, handleRestore]);
+        title: targetSite.title,
+        url: targetSite.url,
+        description: targetSite.description,
+        iframeRef: { current: null },
+        timestamp: Date.now(),
+        cache: {
+          id: targetSite.id,
+          isLoaded: true,
+          lastAccessed: Date.now()
+        }
+      };
+      
+      setMinimizedTabs(prev => [...prev, newTab]);
+      setExpandedSite(siteId);
+    }
+  }, [minimizedTabs, sites, handleRestore]);
 
   const handleFullClose = useCallback(() => {
     setExpandedSite(null);
@@ -652,9 +706,6 @@ const handleExpand = useCallback((siteId: number) => {
       
       return newTabs;
     });
-    
-    // cache clean up 2 hahaha or else ur shit will blow the fuck up
-    tabCacheRef.current.delete(id);
   }, [expandedSite]);
 
   const filteredSites = useMemo(() => 
@@ -665,13 +716,12 @@ const handleExpand = useCallback((siteId: number) => {
     [sites, searchQuery]
   );
 
-  // search
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#000000] relative">
+    <div className="min-h-screen bg-[#000000] relative overflow-hidden touch-none">
       <div className="fixed inset-0">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f05_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f05_1px,transparent_1px)] bg-[size:14px_24px]" />
         <div className="absolute inset-0 bg-gradient-to-tr from-purple-900/[0.02] via-transparent to-purple-900/[0.02]" />
