@@ -15,7 +15,7 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: "DamonicOS",
-  description: "an experimental defi app.",
+  description: "a web browser within a web browser.",
 };
 
 export default function RootLayout({
