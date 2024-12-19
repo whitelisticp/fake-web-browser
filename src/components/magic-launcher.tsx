@@ -59,7 +59,7 @@ const LoadingScreen = () => {
         </div>
         <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
           <p className="text-sm text-purple-300/70 animate-pulse">
-            Loading ShellOS
+            Loading DamonicOS
           </p>
         </div>
       </div>
@@ -476,12 +476,12 @@ const Footer = () => (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="h-14 flex items-center justify-center">
         <a 
-          href="https://mcs.wtf" 
+          href="https://damonicwelleams.com" 
           target="_blank" 
           rel="noopener noreferrer" 
           className="text-purple-300/70 hover:text-purple-300 transition-colors duration-300 flex items-center gap-2 text-sm font-medium"
         >
-          Team MCS 2024
+          Team Damonic
           <ExternalLink className="h-3.5 w-3.5" />
         </a>
       </div>
@@ -523,8 +523,8 @@ const Dashboard = () => {
     if (!mountedRef.current) {
       mountedRef.current = true;
       try {
-        const savedTabs = localStorage.getItem('shellOS-tabs');
-        const savedExpandedSite = localStorage.getItem('shellOS-expandedSite');
+        const savedTabs = localStorage.getItem('damonicOS-tabs');
+        const savedExpandedSite = localStorage.getItem('damonicOS-expandedSite');
         
         if (savedTabs) {
           const parsedTabs = JSON.parse(savedTabs);
@@ -551,12 +551,12 @@ const Dashboard = () => {
         const tabsToSave = minimizedTabs.map(({ id, title, url, description, timestamp }) => 
           ({ id, title, url, description, timestamp })
         );
-        localStorage.setItem('shellOS-tabs', JSON.stringify(tabsToSave));
+        localStorage.setItem('damonicOS-tabs', JSON.stringify(tabsToSave));
         
         if (expandedSite) {
-          localStorage.setItem('shellOS-expandedSite', expandedSite.toString());
+          localStorage.setItem('damonicOS-expandedSite', expandedSite.toString());
         } else {
-          localStorage.removeItem('shellOS-expandedSite');
+          localStorage.removeItem('damonicOS-expandedSite');
         }
       } catch (error) {
         console.error('Error saving tabs:', error);
@@ -767,8 +767,8 @@ const Dashboard = () => {
                   <Command className="h-4 w-4 text-purple-400 group-hover:text-purple-300 transition-colors" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-semibold text-white">ShellOS</h1>
-                  <p className="text-xs text-white/50">by MCS</p>
+                  <h1 className="text-xl font-semibold text-white">DamonicOS</h1>
+                  <p className="text-xs text-white/50">by Damonic</p>
                 </div>
               </div>
 
@@ -786,7 +786,7 @@ const Dashboard = () => {
                   />
                 </div>
                 <a
-                  href="https://github.com/MattiasICP/ShellOS"
+                  href="https://github.com/MattiasICP/DamonicOS"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="h-8 w-8 flex-shrink-0 flex items-center justify-center border border-purple-900/20 rounded-lg

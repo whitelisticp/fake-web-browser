@@ -14,7 +14,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "ShellOS",
+  title: "DamonicOS",
   description: "an experimental defi app.",
 };
 
